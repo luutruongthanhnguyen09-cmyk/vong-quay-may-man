@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vòng Quay May Mắn</title>
+<style>
+  :root{
+    --bg-1:#0f1229;
+    --bg-2:#1a1f42;
+    --gold:#f5c451;
+    --gold-dark:#c9922f;
+    --ink:#fdf9f0;
+    --muted:#b9bcdb;
+    --panel:#171b3a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(1200px 800px at 50% -10%, #262c5c 0%, var(--bg-1) 55%),
+      linear-gradient(180deg, var(--bg-1), var(--bg-2));
+    font-family:'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    color:var(--ink);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:36px 16px 60px;
+    overflow-x:hidden;
+  }
+  h1{
+    font-size:clamp(24px, 4vw, 38px);
+    letter-spacing:0.5px;
+    margin:0 0 4px;
+    text-align:center;
+    font-weight:800;
+  }
+  h1 span{color:var(--gold);}
+  .subtitle{
+    color:var(--muted);
+    font-size:15px;
+    margin-bottom:28px;
+    text-align:center;
+  }
+  .stage{
+    position:relative;
+    width:min(92vw, 560px);
+    aspect-ratio:1/1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .pointer{
+    position:absolute;
+    top:-6px;
+    left:50%;
+    transform:translateX(-50%);
+    width:0; height:0;
+    border-left:18px solid transparent;
+    border-right:18px solid transparent;
+    border-top:32px solid var(--gold);
+    z-index:5;
+    filter:drop-shadow(0 3px 4px rgba(0,0,0,.4));
+  }
+  .wheel-frame{
+    position:relative;
+    width:100%;
+    height:100%;
+    border-radius:50%;
+    padding:14px;
+    background:
+      conic-gradient(from 0deg, var(--gold), #fff2c9, var(--gold), #d99a2b, var(--gold));
+    box-shadow:0 20px 60px rgba(0,0,0,.55), inset 0 0 0 2px rgba(255,255,255,.15);
+  }
+  #wheelCanvas{
+    width:100%;
+    height:100%;
+    border-radius:50%;
+    display:block;
+    transition: transform 5.5s cubic-bezier(.12,.72,.14,1);
+    box-shadow: inset 0 0 30px rgba(0,0,0,.35);
+  }
+  .hub{
+    position:absolute;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    width:19%;
+    aspect-ratio:1/1;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #ffe9a8, var(--gold) 55%, var(--gold-dark) 100%);
+    box-shadow:0 6px 14px rgba(0,0,0,.45), inset 0 0 0 3px rgba(255,255,255,.25);
+    z-index:4;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    border:none;
+  }
+  .hub span{
+    font-weight:800;
+    font-size:clamp(13px,2.2vw,18px);
+    color:#3a2a06;
+    letter-spacing:0.5px;
+    user-select:none;
+  }
+  .hub:active{transform:translate(-50%,-50%) scale(0.96);}
+  .hub:disabled{cursor:not-allowed; opacity:.85;}
+
+  .result-panel{
+    margin-top:30px;
+    min-height:96px;
+    width:min(92vw, 480px);
+    background:var(--panel);
+    border-radius:16px;
+    padding:18px 22px;
+    text-align:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+    border:1px solid rgba(255,255,255,.06);
+  }
+  .result-label{
+    font-size:13px;
+    color:var(--muted);
+    letter-spacing:0.3px;
+    margin-bottom:6px;
+  }
+  .result-name{
+    font-size:clamp(20px,4vw,28px);
+    font-weight:800;
+    color:var(--gold);
+    min-height:34px;
+  }
+  .removed-note{
+    font-size:13px;
+    color:var(--muted);
+    margin-top:6px;
+  }
+
+  .controls{
+    display:flex;
+    gap:12px;
+    margin-top:18px;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .btn{
+    border:none;
+    border-radius:999px;
+    padding:10px 20px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    background:rgba(255,255,255,.08);
+    color:var(--ink);
+    transition:background .15s ease;
+  }
+  .btn:hover{background:rgba(255,255,255,.15);}
+  .btn.primary{
+    background:var(--gold);
+    color:#3a2a06;
+  }
+  .btn.primary:hover{background:#f8d47c;}
+
+  .list-section{
+    margin-top:38px;
+    width:min(92vw, 720px);
+  }
+  .list-section h2{
+    font-size:15px;
+    color:var(--muted);
+    font-weight:600;
+    margin-bottom:12px;
+    text-align:center;
+  }
+  .name-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+    gap:10px;
+  }
+  .name-chip{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:var(--panel);
+    border-radius:10px;
+    padding:8px 10px;
+    font-size:13px;
+    border:1px solid rgba(255,255,255,.06);
+    transition:opacity .2s ease;
+  }
+  .name-chip.done{opacity:.35; text-decoration:line-through;}
+  .avatar{
+    width:34px;height:34px;
+    border-radius:50%;
+    flex:none;
+    display:flex;align-items:center;justify-content:center;
+    font-size:10px;font-weight:800;color:#fff;
+    border:1.5px solid rgba(255,255,255,.25);
+  }
+  footer{
+    margin-top:46px;
+    color:var(--muted);
+    font-size:12px;
+    text-align:center;
+    max-width:480px;
+    line-height:1.6;
+  }
+</style>
+</head>
+<body>
+
+  <h1>Vòng Quay <span>May Mắn</span></h1>
+  <div class="subtitle">Bấm vào vòng quay để chọn ngẫu nhiên 1 trong 24 người</div>
+
+  <div class="stage">
+    <div class="pointer"></div>
+    <div class="wheel-frame">
+      <canvas id="wheelCanvas" width="1000" height="1000"></canvas>
+    </div>
+    <button class="hub" id="spinBtn" aria-label="Quay"><span>QUAY</span></button>
+  </div>
+
+  <div class="result-panel">
+    <div class="result-label">Kết quả</div>
+    <div class="result-name" id="resultName">—</div>
+    <div class="removed-note" id="removedNote"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn primary" id="spinBtnSecondary">Quay ngay</button>
+    <button class="btn" id="resetBtn">Đặt lại danh sách</button>
+    <button class="btn" id="removeToggle">Loại người trúng khỏi vòng quay: Bật</button>
+  </div>
+
+  <div class="list-section">
+    <h2>Danh sách 24 người</h2>
+    <div class="name-grid" id="nameGrid"></div>
+  </div>
+
+  <footer>
+    File này chạy hoàn toàn ngoại tuyến (offline) — chỉ cần mở bằng trình duyệt (Chrome, Edge, Safari, Cốc Cốc...), không cần kết nối wifi hay internet.
+  </footer>
+
+<script>
+const allNames = [
+  "Võ Ngọc Thảo Anh","Nguyễn Kỳ Duyên","Nguyễn Thị Cẩm Giang","Nguyễn Thị Quỳnh Hương",
+  "Lưu Trung Kiên","Trần Anh Kim","Nguyễn Hoàng Mạnh","Lê Trương Thảo Nghi",
+  "Lưu Trương Thanh Nguyện","Huỳnh Thị Mỹ Nhân","Huỳnh Bảo Nhi","Lương Bích Nhi",
+  "Nguyễn Mai Mỹ Phụng","Trần Thị Rớt","Bùi Cao Sáng","Phan Thị Phương Thảo",
+  "Đinh Hải Thy","Hà Bảo Tính","Phạm Bích Trâm","Võ Ngọc Trân",
+  "Lê Ngọc Trúc","Nguyễn Quốc Trung","Trịnh Thảo Vy","Trương Tường Vy"
+];
+
+const N = allNames.length;
+// Distinct, evenly spaced hues around the wheel
+function colorFor(i){
+  const hue = Math.round((360/N) * i);
+  return `hsl(${hue}, 68%, 52%)`;
+}
+function textColorFor(i){
+  return '#fff2d6';
+}
+function initials(name){
+  const parts = name.trim().split(/\s+/);
+  const a = parts[parts.length-2] || '';
+  const b = parts[parts.length-1] || '';
+  return (a[0]||'') + (b[0]||'');
+}
+
+// ---- Procedurally generated "AI-style" face avatars (no external images, fully offline) ----
+function faceParams(i){
+  const skinTones = ['#FFDFC4','#F0C29C','#D8A377','#B67D4E','#8D5A34','#5C3A22'];
+  const hairColors = ['#1B1B1B','#3B2314','#5A3825','#7A4B25','#A9702E','#C98A3B','#6B4226','#2E2E2E'];
+  const hairStyles = ['bald','short','part','curly','bun','spiky'];
+  const eyeStyles = ['dot','oval','happy'];
+  const mouthStyles = ['smile','open','line'];
+  return {
+    skin: skinTones[i % skinTones.length],
+    hair: hairColors[(i*3+1) % hairColors.length],
+    hairStyle: hairStyles[i % hairStyles.length],
+    eyeStyle: eyeStyles[(i+1) % eyeStyles.length],
+    mouthStyle: mouthStyles[(i+2) % mouthStyles.length],
+    glasses: (i % 5 === 0)
+  };
+}
+function drawFace(fctx, x, y, r, p){
+  fctx.save();
+  fctx.translate(x,y);
+  fctx.beginPath(); fctx.arc(0,0,r,0,Math.PI*2); fctx.fillStyle='rgba(255,255,255,0.92)'; fctx.fill();
+  const fr = r*0.86;
+  fctx.fillStyle = p.skin;
+  fctx.beginPath(); fctx.arc(-fr*0.92, fr*0.05, fr*0.16, 0, Math.PI*2); fctx.fill();
+  fctx.beginPath(); fctx.arc(fr*0.92, fr*0.05, fr*0.16, 0, Math.PI*2); fctx.fill();
+  fctx.beginPath(); fctx.arc(0,0,fr,0,Math.PI*2); fctx.fillStyle=p.skin; fctx.fill();
+
+  const eyeY = -fr*0.05, eyeDX = fr*0.38;
+  if(p.eyeStyle==='dot'){
+    fctx.fillStyle='#2b2b2b';
+    fctx.beginPath(); fctx.arc(-eyeDX,eyeY,fr*0.09,0,Math.PI*2); fctx.fill();
+    fctx.beginPath(); fctx.arc(eyeDX,eyeY,fr*0.09,0,Math.PI*2); fctx.fill();
+  } else if(p.eyeStyle==='oval'){
+    [-eyeDX,eyeDX].forEach(ex=>{
+      fctx.beginPath(); fctx.ellipse(ex,eyeY,fr*0.11,fr*0.14,0,0,Math.PI*2); fctx.fillStyle='#fff'; fctx.fill();
+      fctx.beginPath(); fctx.arc(ex,eyeY,fr*0.06,0,Math.PI*2); fctx.fillStyle='#2b2b2b'; fctx.fill();
+    });
+  } else {
+    fctx.strokeStyle='#2b2b2b'; fctx.lineWidth=fr*0.06; fctx.lineCap='round';
+    [-eyeDX,eyeDX].forEach(ex=>{
+      fctx.beginPath(); fctx.arc(ex,eyeY+fr*0.05,fr*0.11,Math.PI*1.1,Math.PI*1.9); fctx.stroke();
+    });
+  }
+
+  fctx.fillStyle='rgba(255,140,140,0.35)';
+  fctx.beginPath(); fctx.ellipse(-fr*0.55,fr*0.28,fr*0.12,fr*0.08,0,0,Math.PI*2); fctx.fill();
+  fctx.beginPath(); fctx.ellipse(fr*0.55,fr*0.28,fr*0.12,fr*0.08,0,0,Math.PI*2); fctx.fill();
+
+  const mY = fr*0.42;
+  fctx.strokeStyle='#7a3b2e'; fctx.lineWidth=fr*0.06; fctx.lineCap='round';
+  if(p.mouthStyle==='smile'){
+    fctx.beginPath(); fctx.arc(0, mY-fr*0.12, fr*0.28, Math.PI*0.15, Math.PI*0.85); fctx.stroke();
+  } else if(p.mouthStyle==='open'){
+    fctx.beginPath(); fctx.ellipse(0,mY,fr*0.16,fr*0.1,0,0,Math.PI*2); fctx.fillStyle='#7a3b2e'; fctx.fill();
+    fctx.beginPath(); fctx.ellipse(0,mY-fr*0.03,fr*0.12,fr*0.05,0,0,Math.PI*2); fctx.fillStyle='#fff'; fctx.fill();
+  } else {
+    fctx.beginPath(); fctx.moveTo(-fr*0.15,mY); fctx.lineTo(fr*0.15,mY); fctx.stroke();
+  }
+
+  fctx.fillStyle = p.hair;
+  const outerR = fr*1.08, innerR = fr*0.80, a0 = Math.PI*1.05, a1 = Math.PI*1.95;
+  function capPath(){
+    fctx.beginPath();
+    fctx.arc(0,0,outerR,a0,a1);
+    fctx.arc(0,0,innerR,a1,a0,true);
+    fctx.closePath();
+  }
+  if(p.hairStyle==='short'){
+    capPath(); fctx.fill();
+  } else if(p.hairStyle==='part'){
+    capPath(); fctx.fill();
+    fctx.beginPath();
+    fctx.moveTo(fr*0.25,-fr*0.82);
+    fctx.quadraticCurveTo(fr*0.62,-fr*0.55,fr*0.38,-fr*0.28);
+    fctx.quadraticCurveTo(fr*0.55,-fr*0.55,fr*0.45,-fr*0.88);
+    fctx.closePath(); fctx.fill();
+  } else if(p.hairStyle==='bun'){
+    capPath(); fctx.fill();
+    fctx.beginPath(); fctx.arc(0,-fr*1.18,fr*0.26,0,Math.PI*2); fctx.fill();
+  } else if(p.hairStyle==='curly'){
+    const bumps=9;
+    for(let b=0;b<bumps;b++){
+      const a=a0+(a1-a0)*(b/(bumps-1));
+      fctx.beginPath(); fctx.arc(Math.cos(a)*fr*1.0, Math.sin(a)*fr*1.0, fr*0.19,0,Math.PI*2); fctx.fill();
+    }
+  } else if(p.hairStyle==='spiky'){
+    const spikes=7;
+    for(let s=0;s<spikes;s++){
+      const a=a0+(a1-a0)*(s/(spikes-1));
+      const bx=Math.cos(a)*fr*0.85, by=Math.sin(a)*fr*0.85;
+      const tipx=Math.cos(a)*fr*1.4, tipy=Math.sin(a)*fr*1.4;
+      const a1s=a-0.12,a2s=a+0.12;
+      fctx.beginPath();
+      fctx.moveTo(Math.cos(a1s)*fr*0.85,Math.sin(a1s)*fr*0.85);
+      fctx.lineTo(tipx,tipy);
+      fctx.lineTo(Math.cos(a2s)*fr*0.85,Math.sin(a2s)*fr*0.85);
+      fctx.closePath(); fctx.fill();
+    }
+  }
+
+  if(p.glasses){
+    fctx.strokeStyle='#2b2b2b'; fctx.lineWidth=fr*0.05;
+    [-eyeDX,eyeDX].forEach(ex=>{ fctx.beginPath(); fctx.arc(ex,eyeY,fr*0.16,0,Math.PI*2); fctx.stroke(); });
+    fctx.beginPath(); fctx.moveTo(-eyeDX+fr*0.16,eyeY); fctx.lineTo(eyeDX-fr*0.16,eyeY); fctx.stroke();
+  }
+  fctx.restore();
+}
+function makeFaceDataURL(i, sizePx){
+  const c = document.createElement('canvas');
+  c.width = sizePx; c.height = sizePx;
+  const cctx = c.getContext('2d');
+  drawFace(cctx, sizePx/2, sizePx/2, sizePx/2 - 2, faceParams(i));
+  return c.toDataURL();
+}
+const faceImages = allNames.map((_,i)=>makeFaceDataURL(i,96));
+
+
+let active = allNames.map((name,i)=>({name, color: colorFor(i), idx:i}));
+let currentRotation = 0;
+let spinning = false;
+let removeOnWin = true;
+
+const canvas = document.getElementById('wheelCanvas');
+const ctx = canvas.getContext('2d');
+const size = canvas.width;
+const cx = size/2, cy = size/2, R = size/2 - 6;
+
+function drawWheel(){
+  ctx.clearRect(0,0,size,size);
+  const n = active.length;
+  if(n === 0){
+    ctx.fillStyle = '#2a2f5c';
+    ctx.beginPath();
+    ctx.arc(cx,cy,R,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#b9bcdb';
+    ctx.font = 'bold 34px Segoe UI, Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Hết danh sách', cx, cy);
+    return;
+  }
+  const seg = (Math.PI*2)/n;
+  for(let i=0;i<n;i++){
+    const start = i*seg - Math.PI/2;
+    const end = start + seg;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,R,start,end);
+    ctx.closePath();
+    ctx.fillStyle = active[i].color;
+    ctx.fill();
+    ctx.save();
+    ctx.strokeStyle = 'rgba(15,18,41,0.55)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // text along radius
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.rotate(start + seg/2);
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = textColorFor(i);
+    const fontSize = n > 20 ? 21 : n > 12 ? 24 : 28;
+    ctx.font = `600 ${fontSize}px Segoe UI, Arial`;
+    ctx.fillText(active[i].name, R - 22, 0);
+
+    // avatar face
+    const avR = 30;
+    const avCx = R - (ctx.measureText(active[i].name).width) - 22 - avR - 12;
+    drawFace(ctx, avCx, 0, avR, faceParams(active[i].idx));
+    ctx.beginPath();
+    ctx.arc(avCx, 0, avR, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(15,18,41,0.55)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+drawWheel();
+
+function renderNameGrid(){
+  const grid = document.getElementById('nameGrid');
+  grid.innerHTML = '';
+  allNames.forEach((name,i)=>{
+    const stillActive = active.some(p=>p.idx===i);
+    const chip = document.createElement('div');
+    chip.className = 'name-chip' + (stillActive ? '' : ' done');
+    const av = document.createElement('div');
+    av.className = 'avatar';
+    av.style.backgroundImage = `url(${faceImages[i]})`;
+    av.style.backgroundSize = 'cover';
+    av.style.backgroundPosition = 'center';
+    const span = document.createElement('span');
+    span.textContent = name;
+    chip.appendChild(av);
+    chip.appendChild(span);
+    grid.appendChild(chip);
+  });
+}
+renderNameGrid();
+
+function setButtons(disabled){
+  document.getElementById('spinBtn').disabled = disabled;
+  document.getElementById('spinBtnSecondary').disabled = disabled;
+}
+
+function spin(){
+  if(spinning) return;
+  if(active.length === 0) return;
+  spinning = true;
+  setButtons(true);
+  document.getElementById('resultName').textContent = '...';
+  document.getElementById('removedNote').textContent = '';
+
+  const n = active.length;
+  const winnerIndex = Math.floor(Math.random()*n);
+  const seg = 360/n;
+  // segment i occupies [i*seg, (i+1)*seg) measured from top(0deg), clockwise, with -90deg offset baked in canvas
+  // pointer is fixed at top (0deg / 12 o'clock). We rotate the wheel so winner segment center lands at top.
+  const segCenterAngle = winnerIndex*seg + seg/2; // angle of segment center from top, clockwise
+  const fullSpins = 6 + Math.floor(Math.random()*3); // 6-8 full turns
+  // current rotation mod 360
+  const currentMod = ((currentRotation % 360) + 360) % 360;
+  // We want final rotation R such that: (segCenterAngle + R) mod 360 == 0  => the segment center aligns with pointer at top
+  // solve target final mod
+  let targetMod = (360 - segCenterAngle) % 360;
+  let delta = ((targetMod - currentMod) % 360 + 360) % 360;
+  const finalRotation = currentRotation + fullSpins*360 + delta;
+
+  currentRotation = finalRotation;
+  canvas.style.transform = `rotate(${finalRotation}deg)`;
+
+  setTimeout(()=>{
+    const winner = active[winnerIndex];
+    document.getElementById('resultName').textContent = winner.name;
+    spinning = false;
+    if(removeOnWin){
+      active = active.filter((_,i)=>i!==winnerIndex);
+      drawWheel();
+      renderNameGrid();
+      document.getElementById('removedNote').textContent = active.length > 0
+        ? `Đã loại khỏi vòng quay — còn lại ${active.length} người`
+        : 'Đã quay hết danh sách!';
+    }
+    setButtons(false);
+  }, 5600);
+}
+
+document.getElementById('spinBtn').addEventListener('click', spin);
+document.getElementById('spinBtnSecondary').addEventListener('click', spin);
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(spinning) return;
+  active = allNames.map((name,i)=>({name, color: colorFor(i), idx:i}));
+  currentRotation = 0;
+  canvas.style.transition = 'none';
+  canvas.style.transform = 'rotate(0deg)';
+  requestAnimationFrame(()=>{ canvas.style.transition = 'transform 5.5s cubic-bezier(.12,.72,.14,1)'; });
+  drawWheel();
+  renderNameGrid();
+  document.getElementById('resultName').textContent = '—';
+  document.getElementById('removedNote').textContent = '';
+});
+
+const removeToggleBtn = document.getElementById('removeToggle');
+removeToggleBtn.addEventListener('click', ()=>{
+  removeOnWin = !removeOnWin;
+  removeToggleBtn.textContent = `Loại người trúng khỏi vòng quay: ${removeOnWin ? 'Bật' : 'Tắt'}`;
+});
+</script>
+</body>
+</html>
